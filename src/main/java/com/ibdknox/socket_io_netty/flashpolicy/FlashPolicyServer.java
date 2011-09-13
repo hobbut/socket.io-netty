@@ -13,6 +13,10 @@ public class FlashPolicyServer {
     public static ServerBootstrap bootstrap;
 
     public static void start() {
+        start(843);
+    }
+
+    public static void start(int port) {
         // Configure the server.
         bootstrap = new ServerBootstrap(
                 new NioServerSocketChannelFactory(
@@ -26,7 +30,7 @@ public class FlashPolicyServer {
         bootstrap.setOption("child.keepAlive", true);
 
         // Bind and start to accept incoming connections.
-        serverChannel = bootstrap.bind(new InetSocketAddress(843));
+        serverChannel = bootstrap.bind(new InetSocketAddress(port));
     }
 
     public static void stop() {

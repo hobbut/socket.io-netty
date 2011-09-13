@@ -15,24 +15,55 @@ package com.ibdknox.socket_io_netty.flashpolicy;
  * License for the specific language governing permissions and limitations
  * under the License.
  */
+
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.handler.timeout.ReadTimeoutException;
 import org.jboss.netty.util.CharsetUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author <a href="http://www.waywardmonkeys.com/">Bruce Mitchener</a>
  */
 public class FlashPolicyServerHandler extends SimpleChannelUpstreamHandler {
 
+    private static Logger logger = LoggerFactory.getLogger(FlashPolicyServer.class);
     private static final String NEWLINE = "\r\n";
+
+    private String domain = "*";
+    private String ports = "*";
+
+    public FlashPolicyServerHandler(String domain, String ports) {
+        super();
+        this.domain = domain;
+        this.ports = ports;
+        policyFile = buildPolicyFile();
+    }
+
+    public FlashPolicyServerHandler() {
+        super();
+        policyFile = buildPolicyFile();
+    }
+
+    private String buildPolicyFile() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<?xml version=\"1.0\"?>").append(NEWLINE)
+                .append("<!DOCTYPE cross-domain-policy SYSTEM \"/xml/dtds/cross-domain-policy.dtd\">").append(NEWLINE)
+                .append("<cross-domain-policy> ").append(NEWLINE)
+                .append("   <site-control permitted-cross-domain-policies=\"master-only\"/>").append(NEWLINE)
+                .append("   <allow-access-from domain=\"").append(domain).append(" to-ports=\"").append(ports).append("\" />").append(NEWLINE)
+                .append("</cross-domain-policy>");
+        return builder.toString();
+    }
+
+    private String policyFile;
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
@@ -42,24 +73,22 @@ public class FlashPolicyServerHandler extends SimpleChannelUpstreamHandler {
     }
 
     private ChannelBuffer getPolicyFileContents() throws Exception {
-        return ChannelBuffers.copiedBuffer(
-            "<?xml version=\"1.0\"?>" + NEWLINE +
-            "<!DOCTYPE cross-domain-policy SYSTEM \"/xml/dtds/cross-domain-policy.dtd\">" + NEWLINE +
-            "<cross-domain-policy> " + NEWLINE +
-            "   <site-control permitted-cross-domain-policies=\"master-only\"/>" + NEWLINE +
-            "   <allow-access-from domain=\"*\" to-ports=\"*\" />" + NEWLINE +
-            "</cross-domain-policy>" + NEWLINE,
-            CharsetUtil.US_ASCII);
+        return ChannelBuffers.copiedBuffer(policyFile, CharsetUtil.US_ASCII);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
             throws Exception {
-        if (e.getCause() instanceof ReadTimeoutException) {
-            System.out.println("Connection timed out.");
+        Throwable cause = e.getCause();
+        if (cause instanceof ReadTimeoutException) {
+            if (logger.isErrorEnabled()) {
+                logger.error("Connection timed out.", cause);
+            }
             e.getChannel().close();
         } else {
-            e.getCause().printStackTrace();
+            if (logger.isErrorEnabled()) {
+                logger.error(cause.getMessage(), cause);
+            }
             e.getChannel().close();
         }
     }

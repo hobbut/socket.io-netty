@@ -1,2 +1,12 @@
+#OS X Files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+#ignore maven build
 target/*
-*.class
+#ignore idea files
+*.iml
+*.ipr
+*.iws
+.idea/

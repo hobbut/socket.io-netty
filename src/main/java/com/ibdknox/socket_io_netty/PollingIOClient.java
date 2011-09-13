@@ -3,12 +3,10 @@ package com.ibdknox.socket_io_netty;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.isKeepAlive;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.setContentLength;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
-import static org.jboss.netty.handler.codec.http.HttpResponseStatus.ACCEPTED;
 import static org.jboss.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
-import java.nio.channels.ClosedChannelException;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
@@ -24,13 +22,12 @@ import org.jboss.netty.util.CharsetUtil;
 
 public class PollingIOClient extends GenericIOClient {
 
-    private List<String> queue;
+    private final Queue<String> queue = new LinkedBlockingQueue<String>();
     private HttpRequest req;
     private boolean connected;
 
     public PollingIOClient(ChannelHandlerContext ctx, String uID) {
         super(ctx, uID);
-        queue = new LinkedList<String>();
     }
 
     public void Reconnect(ChannelHandlerContext ctx, HttpRequest req) {
@@ -41,20 +38,18 @@ public class PollingIOClient extends GenericIOClient {
     }
 
     private void _payload() {
-        if(!connected || queue.isEmpty()) return;
-        //TODO: is this necessary to synchronize?
-        synchronized(queue) {
-            StringBuilder sb = new StringBuilder();
-            for(String message : queue) {
-                sb.append(message);
-            }
-            _write(sb.toString());
-            queue.clear();
+        if (!connected || queue.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        while (queue.size() > 0) {
+            sb.append(queue.poll());
         }
+        _write(sb.toString());
+        queue.clear();
+
     }
 
     private void _write(String message) {
-        if(!this.open) return;
+        if (!this.open) return;
 
         HttpResponse res = new DefaultHttpResponse(HTTP_1_1, HttpResponseStatus.OK);
 
@@ -68,7 +63,7 @@ public class PollingIOClient extends GenericIOClient {
 
         // Send the response and close the connection if necessary.
         Channel chan = ctx.getChannel();
-        if(chan.isOpen()) {
+        if (chan.isOpen()) {
             ChannelFuture f = chan.write(res);
             if (!isKeepAlive(req) || res.getStatus().getCode() != 200) {
                 f.addListener(ChannelFutureListener.CLOSE);
@@ -85,7 +80,7 @@ public class PollingIOClient extends GenericIOClient {
     }
 
     public void sendPulse() {
-        if(connected) {
+        if (connected) {
             _write("");
         }
     }
